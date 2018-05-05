@@ -11,7 +11,7 @@ class MultiSelect extends Component {
     this.renderRow = this.renderRow.bind(this);
     this.selectRow = this.selectRow.bind(this);
     this.generateDataSource = this.generateDataSource.bind(this);
-    
+
     this.state = {
       selectedRows: props.selectedOptions || [],
     };
@@ -28,47 +28,52 @@ class MultiSelect extends Component {
     }
   }
 
-  shouldComponentUpdate(nextProps) {
+  shouldComponentUpdate(nextProps, nextState) {
     // This is a performance check as this sometimes gets updated often
-    if (nextProps.selectedOptions.length === this.props.selectedOptions.length) {
+    if (
+      nextProps.selectedOptions === this.props.selectedOptions &&
+      nextState.selectedRows === this.state.selectedRows
+    ) {
       return false;
     }
     return true;
   }
 
-  generateDataSource(options) { // eslint-disable-line class-methods-use-this
+  generateDataSource(options) {
+    // eslint-disable-line class-methods-use-this
     return new ListView.DataSource({
       rowHasChanged: (r1, r2) => r1 !== r2,
     }).cloneWithRows(options);
   }
 
-  selectRow(row) {
-    const { selectedRows } = this.state;
-    const indexToRemove = selectedRows.indexOf(row.key);
+  onSelectionChangeIfNeeded = row => () => {
+    if (this.props.onSelectionChange) {
+      this.props.onSelectionChange(row, this.state.selectedRows);
+    }
+  };
 
-    this.setState(
-      (() => {
-        if (indexToRemove !== -1) {
-          return {
-            selectedRows: [
-              ...selectedRows.slice(0, indexToRemove),
-              ...selectedRows.slice(indexToRemove + 1),
-            ],
-          };
-        }
+  selectRow(row) {
+    this.setState((prevState) => {
+      const indexToRemove = prevState.selectedRows.indexOf(row.key);
+
+      if (indexToRemove !== -1) {
         return {
-          selectedRows: [...selectedRows].concat([row.key]),
+          selectedRows: [
+            ...prevState.selectedRows.slice(0, indexToRemove),
+            ...prevState.selectedRows.slice(indexToRemove + 1),
+          ],
         };
-      })(),
-      () => this.props.onSelectionChange(row, this.state.selectedRows),
-    );
+      }
+      return {
+        selectedRows: [...prevState.selectedRows, row.key],
+      };
+    }, this.onSelectionChangeIfNeeded(row));
   }
 
   renderRow(row) {
     if (!row.item) {
       return false;
     }
-
     const {
       renderRow: _renderRow,
       rowStyle,
@@ -77,11 +82,9 @@ class MultiSelect extends Component {
       activeOpacity,
     } = this.props;
     const { selectedRows } = this.state;
-    const isSelected = (
+    const isSelected =
       selectedRows.indexOf(row.item.key) !== -1 ||
-      (selectedOptions && selectedOptions.indexOf(row.item.key) !== -1)
-    );
-
+      (selectedOptions && selectedOptions.indexOf(row.item.key) !== -1);
     return (
       <MultiSelectRow
         row={row.item}
@@ -100,19 +103,14 @@ class MultiSelect extends Component {
     let view = null;
 
     if (useSections) {
-      view = (
-        <SectionList
-          sections={options}
-          renderItem={this.renderRow}
-          {...listProps}
-        />
-      );
+      view = <SectionList sections={options} renderItem={this.renderRow} {...listProps} />;
     } else {
       view = (
         <FlatList
           data={options}
           renderItem={this.renderRow}
           {...listProps}
+          extraData={this.state}
         />
       );
     }
